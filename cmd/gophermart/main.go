@@ -9,6 +9,8 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/yury-kuznetsov/gofermart/cmd/gophermart/config"
 	"github.com/yury-kuznetsov/gofermart/cmd/gophermart/handlers"
+	balanceRepository "github.com/yury-kuznetsov/gofermart/internal/balance/repository"
+	balanceService "github.com/yury-kuznetsov/gofermart/internal/balance/service"
 	userRepository "github.com/yury-kuznetsov/gofermart/internal/user/repository"
 	userService "github.com/yury-kuznetsov/gofermart/internal/user/service"
 	"github.com/yury-kuznetsov/gofermart/middleware"
@@ -65,8 +67,29 @@ func service() http.Handler {
 	userSvc := userService.NewUserService(userRepo)
 	jwtSvc := userService.NewTokenService()
 
+	// сервис отображения баланса
+	balanceRepo := balanceRepository.NewBalanceRepository(db)
+	balanceSrv := balanceService.NewBalanceService(balanceRepo)
+
+	// сервис начисления баланса
+	accrualRepo := balanceRepository.NewAccrualRepository(db)
+	accrualSrv := balanceService.NewAccrualService(balanceRepo, accrualRepo)
+
+	// сервис списания баланса
+	withdrawalRepo := balanceRepository.NewWithdrawalRepository(db)
+	withdrawSrv := balanceService.NewWithdrawalService(balanceRepo, withdrawalRepo)
+
 	r.Post("/api/user/register", handlers.RegisterHandler(userSvc, jwtSvc))
 	r.Post("/api/user/login", handlers.LoginHandler(userSvc, jwtSvc))
+
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtSvc))
+		r.Get("/api/user/balance", handlers.GetBalanceHandler(balanceSrv))
+		r.Post("/api/user/orders", handlers.LoadNumberHandler(accrualSrv))
+		r.Get("/api/user/orders", handlers.GetOrdersHandler(accrualSrv))
+		r.Post("/api/user/balance/withdraw", handlers.WithdrawHandler(withdrawSrv))
+		r.Get("/api/user/withdrawals", handlers.GetWithdrawalsHandler(withdrawSrv))
+	})
 
 	return r
 }
