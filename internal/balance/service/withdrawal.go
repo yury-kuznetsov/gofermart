@@ -5,7 +5,7 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"github.com/yury-kuznetsov/gofermart/internal/balance/model"
-	"github.com/yury-kuznetsov/gofermart/validation"
+	"github.com/yury-kuznetsov/gofermart/internal/validation"
 	"time"
 )
 
